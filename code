@@ -1,1 +1,167 @@
-#programming project code
+#coding 
+# necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+df = pd.read_csv("REAL_HOUSES_MADRID.csv")
+
+# FIRST PART OF THE PROJECT / MAKING CLIENTS UNDERSTAND MADRID CURRENT REAL ESTATE SITUATION WITH GRAPHS AND INFORMATION
+
+
+# We create a file to write our conclusions
+with open('conclusions.txt', 'w') as file:
+
+
+    # we visualize the spread of prices for different types of houses
+    plt.figure(figsize=(12, 6))
+    sns.violinplot(x='house_type_id', y='buy_price', data=df)
+    plt.title('Violin Plot of Prices by House Type')
+    plt.xlabel('House Type')
+    plt.ylabel('Buy Price')
+    plt.show()
+
+    # average price in each neighborhood to guide clients
+    plt.figure(figsize=(16, 8))
+    sns.barplot(x='subtitle', y='buy_price', data=df, errorbar=None)
+    plt.title('Average Price in Each Neighborhood')
+    plt.xlabel('Neighborhood')
+    plt.ylabel('Average Buy Price')
+    plt.xticks(rotation=45, ha='right')  # we rotate the axis for it to be clearer
+    plt.show()
+
+    # average price of sq meter in madrid and then in each neighbourhood
+    # fist we calculate the information
+    df['price_per_sq_meter'] = df['buy_price'] / df['sq_mt_built']
+    madrid_avg_price_per_sq_meter = df['price_per_sq_meter'].mean()
+    neighborhood_avg_price_per_sq_meter = df.groupby('subtitle')['price_per_sq_meter'].mean().reset_index()
+    # we print it so its clearer
+    print(f'Madrid Average Price per Square Meter: {madrid_avg_price_per_sq_meter:.2f}\n')
+    print('Neighborhood Average Prices per Square Meter:')
+    print(neighborhood_avg_price_per_sq_meter)
+    # finally we plot it
+    plt.figure(figsize=(16, 8))
+    plt.axhline(y=madrid_avg_price_per_sq_meter, color='r', linestyle='-', label='Madrid Average')
+    sns.barplot(x='subtitle', y='price_per_sq_meter', data=neighborhood_avg_price_per_sq_meter, errorbar=None)
+    plt.title('Average Price per Square Meter in Madrid and Each Neighborhood')
+    plt.xlabel('Neighborhood')
+    plt.ylabel('Average Price per Square Meter')
+    plt.xticks(rotation=45, ha='right')
+    plt.legend()
+    plt.show()
+    file.write('Conclusions about Average Price in Each Neighborhood: [Information about amenities was gathered from the dataset to show clients the relationship they present with price. We need clients to understand that most amenities are not included in all apartments and they represent an increase in price. And how much the increment will be depending on what amenity they desire.]\n\n')
+
+    # relationship between property size and prices
+    sns.set(style="whitegrid")
+    plt.figure(figsize=(12, 8))
+    sns.scatterplot(x='sq_mt_built', y='buy_price', data=df, alpha=0.7)
+    plt.title('Scatter Plot of House Size vs. Price')
+    plt.xlabel('House Size (Square Footage)')
+    plt.ylabel('Price')
+    plt.show()
+
+    # correlation between amenities and price
+    amenities_cols = ['has_lift', 'has_terrace', 'is_exterior', 'has_parking', "has_storage_room"]
+    amenities_df = df[['buy_price'] + amenities_cols]
+    amenities_df.fillna(False, inplace=True)
+    correlation_matrix = amenities_df.corr()
+    price_correlation = correlation_matrix.loc['buy_price', amenities_cols]
+    print("Correlation between House Prices and Amenities:")
+    print(price_correlation)
+    file.write('Conclusions about relationship in price and amenities: [Clients need to understand that the two most expensive neighbourhoods are Jéronimos and Retiro (around 6000 euros per sq/m). The cheapest neighbourhoods are San Cristobal and villaverde with an average price of 1500 euros sq/m.]\n\n')
+
+    # and a heat map to visualize it better
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(correlation_matrix, annot=True, cmap="coolwarm", fmt=".2f", linewidths=.5)
+    plt.title('Correlation Heatmap: House Prices and Amenities')
+    plt.show()
+
+    # table of houses with different amenities
+    amenity_percentages = df[['has_lift', 'has_garden', 'has_pool', 'has_terrace', "has_parking"]].count()
+    amenity_percentages = amenity_percentages.reset_index()
+    amenity_percentages.columns = ['Amenity', 'Count']
+    print(amenity_percentages)
+
+    # when were houses built
+    yearly_trends = df['built_year'].value_counts().reset_index()
+    yearly_trends.columns = ['Year Built', 'Number of Houses']
+    yearly_trends = yearly_trends.sort_values(by='Year Built')
+    # we first print it
+    print("Yearly Trends in Number of Houses Built:")
+    print(yearly_trends)
+    # then plot it
+    plt.figure(figsize=(12, 6))
+    sns.lineplot(x='Year Built', y='Number of Houses', data=yearly_trends, marker='o', color='blue')
+    plt.title('Number of Houses Built Each Year')
+    plt.xlabel('Year Built')
+    plt.ylabel('Number of Houses')
+    plt.xticks(rotation=45, ha='right')
+    plt.grid(True)
+    plt.show()
+    file.write('Conclusions about how old houses are: [We can see on the graph that the highest number of houses were built between 1960 and 1970, with three major peaks in this decade. The number of houses built drops in the following years, with a significant peak at the beginning of the 2000s. We can conclude from this that potential customers seem inclined to explore existing housing stock, opting for the convenience and flexibility offered by rental and leasing arrangements rather than building new homes. Clients will therefore need to know that most of the housing they are looking for was built in the 60s and the widest range of housing options we are offering were built in these years. ]\n\n')
+
+print("Conclusions have been saved to 'conclusions.txt'")
+
+# SECOND PART OF THE PROJECT / OUR OWN HOUSE-SEARCH PROGRAM
+def filter_properties(df, neighborhood, max_price, with_elevator, is_exterior, has_parking, num_rooms, num_bathrooms,
+                      top_n=3):
+    # Filter based on user input
+    filtered_properties = df[
+        (df['subtitle'] == neighborhood) &
+        (df['buy_price'] <= max_price) &
+        (df['has_lift'] == with_elevator) &
+        (df['is_exterior'] == is_exterior) &
+        (df['has_parking'] == has_parking) &
+        (df['n_rooms'] >= num_rooms) &
+        (df['n_bathrooms'] >= num_bathrooms)
+        ]
+
+    # Sort by price and return the top results
+    best_results = filtered_properties.sort_values(by='buy_price').head(top_n)
+
+    return best_results
+def main():
+    print("Welcome to the House Buying Advisor!")
+
+    while True:
+        # Ask user for input
+        buy_house = input("Are you looking to buy a house? (yes/no): ").lower()
+
+        if buy_house == "yes":
+            neighborhood = input("Enter the neighborhood you prefer (e.g., Cuatro Caminos, Madrid): ")
+            num_rooms = int(input("Enter the minimum number of rooms you need: "))
+            num_bathrooms = int(input("Enter the minimum number of bathrooms you need: "))
+            max_price = float(input("Enter the maximum price you can afford: "))
+            with_elevator = input("Do you want a house with an elevator? (yes/no): ").lower() == "yes"
+            is_exterior = input("Do you want an exterior house? (yes/no): ").lower() == "yes"
+            has_parking = input("Do you want a house with parking? (yes/no): ").lower() == "yes"
+
+            # Filter properties based on user input
+            best_properties = filter_properties(
+                df, neighborhood, max_price, with_elevator, is_exterior, has_parking, num_rooms, num_bathrooms
+            )
+
+            if not best_properties.empty:
+                print("\nCongratulations! We found the best properties for you:")
+                for idx, property_info in best_properties.iterrows():
+                    print(f"Title: {property_info['title']}, Price: {property_info['buy_price']}")
+
+                # Ask if the user wants to keep looking
+                keep_looking = input("\nDo you want to keep looking for more properties? (yes/no): ").lower()
+
+                if keep_looking != "yes":
+                    print("Thank you for working with us. If you change your mind, feel free to come back!")
+                    break  # Exit the loop if the user doesn't want to continue
+
+            else:
+                print("\nSorry, no matching properties found.")
+
+        else:
+            print("Thank you for using the House Buying Advisor. If you change your mind, feel free to come back!")
+            break  # Exit the loop if the user doesn't want to buy a house
+
+
+if _name_ == "_main_":
+    main()
+
